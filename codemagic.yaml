@@ -1,0 +1,11 @@
+workflows:
+  ios-release:
+    name: Build iOS IPA
+    environment:
+      flutter: stable
+      xcode: latest  # ← ¡FORZA XCODE 16+ (iOS 18 SDK)!
+    scripts:
+      - flutter pub get
+      - flutter build ipa --release --no-codesign
+    artifacts:
+      - build/ios/ipa/*.ipa

@@ -1,0 +1,562 @@
+// my_sales_screen.dart - MODIFICADO CON PDF
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'pdf_service.dart'; // ← NUEVO IMPORT
+
+class MySalesScreen extends StatefulWidget {
+  const MySalesScreen({Key? key}) : super(key: key);
+
+  @override
+  State<MySalesScreen> createState() => _MySalesScreenState();
+}
+
+class _MySalesScreenState extends State<MySalesScreen> {
+  List<dynamic> _ventas = [];
+  bool _isLoading = true;
+  String _error = '';
+  final PDFService _pdfService =
+      PDFService(); // ← NUEVO: Instancia del servicio
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarVentas();
+  }
+
+  Future<void> _cargarVentas() async {
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final vendedorId = prefs.getString('vendedor_id');
+
+      if (token == null || vendedorId == null) {
+        throw Exception('Sesión no válida');
+      }
+
+      final response = await http.get(
+        Uri.parse(
+          'https://sistemasmipclista.com/api_ventas/api/v1/ventas/mis_ventas.php?vendedor_id=$vendedorId',
+        ),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          setState(() {
+            _ventas = data['data'] ?? [];
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ============================================================================
+  // NUEVAS FUNCIONES PARA PDF
+  // ============================================================================
+
+  /// Generar y mostrar PDF
+  Future<void> _verPDF(String venId, String descripcion) async {
+    try {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Generar PDF
+      final response = await _pdfService.generarPDF(venId);
+
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+
+      // Obtener bytes
+      final pdfBytes = response.getPDFBytes();
+
+      if (pdfBytes != null) {
+        // Mostrar PDF
+        if (mounted) {
+          await _pdfService.mostrarPDF(context, pdfBytes, descripcion);
+        }
+      } else {
+        // Descargar desde URL
+        final downloadedBytes = await _pdfService.descargarPDFDesdeURL(
+          response.pdfUrl,
+        );
+        if (mounted) {
+          await _pdfService.mostrarPDF(context, downloadedBytes, descripcion);
+        }
+      }
+    } catch (e) {
+      // Cerrar loading si está abierto
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      // Mostrar error
+      if (mounted) {
+        _mostrarError('Error al generar PDF: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Compartir PDF
+  Future<void> _compartirPDF(String venId, String filename) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Preparando documento...'),
+            ],
+          ),
+        ),
+      );
+
+      final response = await _pdfService.generarPDF(venId);
+
+      if (mounted) Navigator.pop(context);
+
+      final pdfBytes =
+          response.getPDFBytes() ??
+          await _pdfService.descargarPDFDesdeURL(response.pdfUrl);
+
+      await _pdfService.compartirPDF(pdfBytes, filename);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Documento listo para compartir'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      if (mounted) {
+        _mostrarError('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Descargar PDF
+  Future<void> _descargarPDF(String venId) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Descargando...'),
+            ],
+          ),
+        ),
+      );
+
+      final response = await _pdfService.generarPDF(venId);
+
+      final pdfBytes =
+          response.getPDFBytes() ??
+          await _pdfService.descargarPDFDesdeURL(response.pdfUrl);
+
+      final file = await _pdfService.guardarPDFLocal(
+        pdfBytes,
+        response.filename,
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Descargado: ${response.filename}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      if (mounted) {
+        _mostrarError('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Imprimir PDF
+  Future<void> _imprimirPDF(String venId) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Preparando impresión...'),
+            ],
+          ),
+        ),
+      );
+
+      final response = await _pdfService.generarPDF(venId);
+
+      final pdfBytes =
+          response.getPDFBytes() ??
+          await _pdfService.descargarPDFDesdeURL(response.pdfUrl);
+
+      if (mounted) Navigator.pop(context);
+
+      await _pdfService.imprimirPDF(pdfBytes);
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      if (mounted) {
+        _mostrarError('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Mostrar menú de opciones
+  void _mostrarMenuOpciones(BuildContext context, dynamic venta) {
+    final venId = venta['id_venta'] ?? venta['ven_id'] ?? '';
+    final cliente = venta['cliente'] ?? 'Cliente';
+    final serie = venta['serie'] ?? '';
+    final numero = venta['numero'] ?? '';
+    final descripcion = '$serie-$numero | $cliente';
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Encabezado
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.receipt_long, color: Colors.blue, size: 30),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            descripcion,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'ID: $venId',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+
+              // Opciones
+              ListTile(
+                leading: const Icon(Icons.visibility, color: Colors.blue),
+                title: const Text('Ver PDF'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _verPDF(venId, descripcion);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share, color: Colors.green),
+                title: const Text('Compartir'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _compartirPDF(venId, '$serie-$numero.pdf');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.download, color: Colors.orange),
+                title: const Text('Descargar'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _descargarPDF(venId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.print, color: Colors.purple),
+                title: const Text('Imprimir'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _imprimirPDF(venId);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Mostrar error
+  void _mostrarError(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  // ============================================================================
+  // BUILD UI
+  // ============================================================================
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mis Ventas'),
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _cargarVentas,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error.isNotEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(_error),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _cargarVentas,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            )
+          : _ventas.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox, size: 60, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No hay ventas registradas'),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _cargarVentas,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _ventas.length,
+                itemBuilder: (context, index) {
+                  final venta = _ventas[index];
+                  return _buildVentaCard(venta);
+                },
+              ),
+            ),
+    );
+  }
+
+  /// Card de venta
+  Widget _buildVentaCard(dynamic venta) {
+    final cliente = venta['cliente'] ?? 'Sin cliente';
+    final serie = venta['serie'] ?? '';
+    final numero = venta['numero'] ?? '';
+    final fecha = venta['fecha'] ?? '';
+    final total = venta['total'] ?? 0;
+    final estado = venta['estado'] ?? '';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _mostrarMenuOpciones(context, venta),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Fila 1: Serie-Número y Estado
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        serie.startsWith('F')
+                            ? Icons.receipt_long
+                            : Icons.receipt,
+                        color: Colors.blue,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$serie-$numero',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: estado == 'PAGADO' ? Colors.green : Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      estado,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Fila 2: Cliente
+              Text(
+                cliente,
+                style: const TextStyle(fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+
+              // Fila 3: Fecha y Total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        fecha,
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'S/ ${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // Botones de acción rápida
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.visibility, size: 20),
+                    onPressed: () => _verPDF(
+                      venta['id_venta'] ?? '',
+                      '$serie-$numero | $cliente',
+                    ),
+                    tooltip: 'Ver PDF',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.share, size: 20),
+                    onPressed: () => _compartirPDF(
+                      venta['id_venta'] ?? '',
+                      '$serie-$numero.pdf',
+                    ),
+                    tooltip: 'Compartir',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onPressed: () => _mostrarMenuOpciones(context, venta),
+                    tooltip: 'Más opciones',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

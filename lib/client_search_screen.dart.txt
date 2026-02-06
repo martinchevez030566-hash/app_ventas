@@ -1,0 +1,316 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'client_detail_screen.dart';
+
+class ClientSearchScreen extends StatefulWidget {
+  const ClientSearchScreen({super.key});
+
+  @override
+  State<ClientSearchScreen> createState() => _ClientSearchScreenState();
+}
+
+class _ClientSearchScreenState extends State<ClientSearchScreen> {
+  final TextEditingController _docController = TextEditingController();
+  List<dynamic> _ventas = [];
+  bool _isLoading = false;
+  String? _mensaje;
+
+  final String _baseUrl =
+      'https://sistemasmipclista.com/api_ventas/api/v1/clientes/buscar_ventas.php';
+
+  Future<void> _buscarVentas() async {
+    final doc = _docController.text.trim();
+    if (doc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingrese un número de documento')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/login');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _mensaje = null;
+      _ventas = [];
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/clientes/buscar_ventas.php'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'documento': doc}),
+      );
+
+      final Map<String, dynamic> data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        if (mounted) {
+          setState(() {
+            _ventas = data['data'] ?? [];
+            _mensaje = null;
+          });
+        }
+      } else if (data['status'] == 'error' && response.statusCode == 404) {
+        if (mounted) {
+          setState(() {
+            _mensaje = 'Cliente no encontrado';
+          });
+        }
+      } else {
+        final errorMsg = data['message'] ?? 'Error desconocido';
+        if (mounted) {
+          setState(() {
+            _mensaje = errorMsg;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _mensaje = 'No se pudo conectar al servidor';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Buscar Cliente'),
+        backgroundColor: Colors.blue,
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Campo de búsqueda con lupa
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _docController,
+                    decoration: InputDecoration(
+                      labelText: 'N° Documento del cliente',
+                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.badge_outlined),
+                    ),
+                    keyboardType: TextInputType.number,
+                    onSubmitted: (_) => _buscarVentas(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _buscarVentas,
+                  style: ElevatedButton.styleFrom(
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: Colors.blue,
+                  ),
+                  child: const Icon(Icons.search, color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Mensaje de error o "no encontrado"
+            if (_mensaje != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  _mensaje!,
+                  style: TextStyle(
+                    color: _mensaje == 'Cliente no encontrado'
+                        ? Colors.red
+                        : Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+            // Indicador de carga
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator(),
+              ),
+
+            // Lista de ventas
+            if (!_isLoading && _ventas.isNotEmpty)
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _ventas.length,
+                  itemBuilder: (context, index) {
+                    final v = _ventas[index];
+                    final fecha = v['FECHA_VENTA'] ?? 'N/A';
+                    final docVenta = v['NUMERO_DOC'] ?? 'N/A';
+                    final cliente = v['NOMCLIE'] ?? 'Cliente';
+                    final total =
+                        double.tryParse(v['TOTAL']?.toString() ?? '0') ?? 0;
+                    final vendedor = v['VENDEDOR'] ?? 'N/A';
+
+                    final ctd = v['CTD']?.toString() ?? '';
+                    final cnumser = v['CNUMSER']?.toString() ?? '';
+                    final cnumdoc = v['CNUMDOC']?.toString() ?? '';
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      child: InkWell(
+                        onTap: () {
+                          debugPrint('🔍 onTap activado en venta');
+                          debugPrint('   CTD: $ctd');
+                          debugPrint('   CNUMSER: $cnumser');
+                          debugPrint('   CNUMDOC: $cnumdoc');
+
+                          if (ctd.isEmpty ||
+                              cnumser.isEmpty ||
+                              cnumdoc.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Datos incompletos para el detalle',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ClientDetailScreen(
+                                ctd: ctd,
+                                cnumser: cnumser,
+                                cnumdoc: cnumdoc,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(14.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cliente,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          const TextSpan(
+                                            text: 'Fecha: ',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(text: fecha),
+                                        ],
+                                      ),
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          const TextSpan(
+                                            text: 'Doc: ',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(text: docVenta),
+                                        ],
+                                      ),
+                                      style: const TextStyle(fontSize: 14),
+                                      textAlign: TextAlign.right,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Vendedor: ',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(text: vendedor),
+                                  ],
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'Total: S/ ${total.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            // Mensaje inicial
+            if (!_isLoading && _ventas.isEmpty && _mensaje == null)
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    'Ingrese un número de documento y presione la lupa para buscar',
+                    textAlign: TextAlign.center, // ✅ CORREGIDO: era "=center"
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

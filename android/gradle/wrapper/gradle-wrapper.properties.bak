@@ -1,0 +1,6 @@
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.3-all.zip
+distributionSha256Sum=7a9615f46e28747ec6e33dc8d145dafb9e920c1f7e48a9b8a9f713eae9d5b2d0
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists

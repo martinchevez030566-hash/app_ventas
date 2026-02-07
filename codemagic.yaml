@@ -1,13 +1,11 @@
 workflows:
   ios-release:
-    name: Build iOS IPA
+    name: Build iOS IPA for App Store
     environment:
       flutter: stable
       xcode: latest
     scripts:
       - flutter pub get
-      - flutter build ipa --release --no-codesign 2>&1 | tee build.log
-      - find . -name "*.ipa" -type f -print || echo "IPA not found yet"
+      - flutter build ipa --release
     artifacts:
-      - "**/*.ipa"
-      - "build.log"
+      - build/ios/ipa/*.ipa

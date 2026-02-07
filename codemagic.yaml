@@ -7,8 +7,8 @@ workflows:
     scripts:
       - flutter pub get
       - flutter build ipa --release --no-codesign
-      - mkdir -p $HOME/artifacts
-      - find build -type f -name "*.ipa" -exec cp {} $HOME/artifacts/ \;
-      - ls -lh $HOME/artifacts/
+      - mkdir -p \$FCI_BUILD_DIR/artifacts
+      - find build -name "*.ipa" -type f -exec cp {} \$FCI_BUILD_DIR/artifacts/ \;
+      - ls -lh \$FCI_BUILD_DIR/artifacts/
     artifacts:
-      - $HOME/artifacts/*.ipa
+      - artifacts/*.ipa

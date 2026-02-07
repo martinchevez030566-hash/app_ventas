@@ -1,12 +1,14 @@
 workflows:
   ios-release:
-    name: Build iOS
+    name: Build iOS IPA
     environment:
       flutter: stable
       xcode: latest
     scripts:
       - flutter pub get
-      - flutter build ipa --release
-      - find . -name "*.ipa" -print -exec cp {} $FCI_BUILD_DIR 2>/dev/null \;
+      - flutter build ipa --release --no-codesign
+      - mkdir -p $HOME/artifacts
+      - find build -type f -name "*.ipa" -exec cp {} $HOME/artifacts/ \;
+      - ls -lh $HOME/artifacts/
     artifacts:
-      - "*.ipa"
+      - $HOME/artifacts/*.ipa

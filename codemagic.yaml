@@ -6,6 +6,7 @@ workflows:
       xcode: latest
     scripts:
       - flutter pub get
-      - flutter build ipa --release --no-codesign
+      - flutter build ipa --release
+      - find . -name "*.ipa" -print -exec cp {} $FCI_BUILD_DIR 2>/dev/null \;
     artifacts:
-      - build/ios/ipa/*.ipa
+      - "*.ipa"

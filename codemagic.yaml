@@ -6,7 +6,8 @@ workflows:
       xcode: latest
     scripts:
       - flutter pub get
-      - flutter build ipa --release --no-codesign
-      - ls -la build/ios/ipa/  # DEBUG: muestra dónde está el IPA
+      - flutter build ipa --release --no-codesign 2>&1 | tee build.log
+      - find . -name "*.ipa" -type f -print || echo "IPA not found yet"
     artifacts:
-      - build/ios/ipa/*.ipa    # RUTA RELATIVA CORRECTA (desde raíz del proyecto)
+      - "**/*.ipa"
+      - "build.log"

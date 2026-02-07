@@ -7,8 +7,6 @@ workflows:
     scripts:
       - flutter pub get
       - flutter build ipa --release --no-codesign
-      - mkdir -p \$FCI_BUILD_DIR/artifacts
-      - find build -name "*.ipa" -type f -exec cp {} \$FCI_BUILD_DIR/artifacts/ \;
-      - ls -lh \$FCI_BUILD_DIR/artifacts/
+      - ls -la build/ios/ipa/  # DEBUG: muestra dónde está el IPA
     artifacts:
-      - artifacts/*.ipa
+      - build/ios/ipa/*.ipa    # RUTA RELATIVA CORRECTA (desde raíz del proyecto)

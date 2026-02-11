@@ -1,0 +1,8 @@
+name: Build iOS IPA
+
+on:
+…      - name: Upload IPA as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app_ventas-ipa
+          path: build/ios/ipa/*.ipa

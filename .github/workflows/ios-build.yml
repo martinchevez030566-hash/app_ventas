@@ -1,6 +1,0 @@
-name: Build iOS IPA
-on: [workflow_dispatch]
-jobs:
-  build:
-…          name: app_ventas-ipa
-          path: build/ios/ipa/*.ipa

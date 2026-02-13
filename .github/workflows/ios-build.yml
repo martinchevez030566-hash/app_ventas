@@ -1,10 +1,6 @@
 name: Build iOS IPA
-
-on:
-  workflow_dispatch:
-
+on: [workflow_dispatch]
 jobs:
-…        uses: actions/upload-artifact@v4
-        with:
-          name: app_ventas-ipa
+  build:
+…          name: app_ventas-ipa
           path: build/ios/ipa/*.ipa

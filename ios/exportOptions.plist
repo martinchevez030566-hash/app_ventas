@@ -4,7 +4,14 @@
 <dict>
     <key>method</key>
     <string>app-store</string>
-    <key>NVV5442KJK</key>
-    <string>TT6P5477S2U</string>
+    <key>teamID</key>
+    <string>NVV5442KJK</string>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.mpcl.appVentas</key>
+        <string>Ventas_AppStore_Profile</string>
+    </dict>
 </dict>
 </plist>

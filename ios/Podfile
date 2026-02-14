@@ -1,5 +1,5 @@
 platform :ios, '13.0'
-source 'file://' + File.expand_path('~/.cocoapods/repos/master')
+source 'https://cdn.cocoapods.org/'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 

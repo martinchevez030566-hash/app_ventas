@@ -52,12 +52,17 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 3. COMPILAR EL IPA (FORZANDO EL PERFIL POR LÍNEA DE COMANDOS)
+      # 3. COMPILAR EL IPA (USANDO XCARGS PARA LA FIRMA)
       - name: Build IPA
         run: |
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
             --build-number ${GITHUB_RUN_NUMBER} \
-            --build-name=1.0.${GITHUB_RUN_NUMBER} \
-            --code-sign-style=Manual \
-            --provisioning-profile="Ventas_AppStore_Profile"
+            --xcargs "CODE_SIGN_STYLE=Manual,PROVISIONING_PROFILE_SPECIFIER=Ventas_AppStore_Profile"
+
+      # 4. SUBIR EL IPA
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ventas-release
+          path: build/ios/ipa/*.ipa

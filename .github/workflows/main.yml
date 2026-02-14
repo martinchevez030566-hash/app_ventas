@@ -27,24 +27,19 @@ jobs:
           CERT_PATH=$RUNNER_TEMP/build_cert.p12
           PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
           echo -n "$P12_CERT" | base64 --decode > $CERT_PATH
           echo -n "$PROVISIONING_PROFILE" | base64 --decode > $PP_PATH
-
           security create-keychain -p "" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "" $KEYCHAIN_PATH
-          
           security import $CERT_PATH -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild -t cert -f pkcs12 -A
-
           security list-keychain -d user -s $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
-
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
       # 2. INSTALAR DEPENDENCIAS
-      - name: Install Dependencies and Pods
+      - name: Install Dependencies
         run: |
           flutter pub get
           cd ios
@@ -52,21 +47,17 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 3. COMPILAR EL IPA (USANDO DEFINICIONES DE LÍNEA DE COMANDOS)
+      # 3. COMPILAR (SOLUCIÓN: quitamos --no-codesign para que genere el IPA)
       - name: Build IPA
         run: |
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
-            --build-number ${GITHUB_RUN_NUMBER} \
-            --no-codesign # Primero generamos el build sin firmar para evitar el error de cuentas
+            --build-number ${GITHUB_RUN_NUMBER}
 
-# 4. SUBIR EL IPA (Ruta corregida para encontrar el archivo)
+      # 4. DIAGNÓSTICO Y SUBIDA (Busca en todas partes)
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ventas-release
-          # Usamos un patrón más amplio por si Flutter lo guardó en la raíz de build
-          path: |
-            build/ios/ipa/*.ipa
-            build/ios/archive/*.ipa
-            ios/*.ipa
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error # Esto nos avisará si falla de nuevo

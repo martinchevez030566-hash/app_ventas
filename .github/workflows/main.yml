@@ -47,7 +47,7 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 3. COMPILAR IPA
+      # 3. COMPILAR IPA (FLUJO ROBUSTO)
       - name: Build IPA
         run: |
           flutter build ipa --release \

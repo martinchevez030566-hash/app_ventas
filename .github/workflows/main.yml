@@ -52,11 +52,10 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 3. COMPILAR EL IPA (USANDO LOS DATOS QUE PROPORCIONASTE)
+      # 3. COMPILAR EL IPA (SOLUCIÓN AL ERROR DE COMPATIBILIDAD)
       - name: Build IPA
         run: |
           flutter build ipa --release \
-            --export-method app-store \
             --export-options-plist=ios/ExportOptions.plist \
             --build-number ${GITHUB_RUN_NUMBER}
 

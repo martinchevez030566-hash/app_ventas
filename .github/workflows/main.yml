@@ -47,17 +47,16 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 3. COMPILAR (SOLUCIÓN: quitamos --no-codesign para que genere el IPA)
+      # 3. COMPILAR IPA
       - name: Build IPA
         run: |
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
             --build-number ${GITHUB_RUN_NUMBER}
 
-      # 4. DIAGNÓSTICO Y SUBIDA (Busca en todas partes)
+      # 4. SUBIR RESULTADO
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ventas-release
           path: build/ios/ipa/*.ipa
-          if-no-files-found: error # Esto nos avisará si falla de nuevo

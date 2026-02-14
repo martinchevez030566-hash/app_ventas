@@ -60,9 +60,13 @@ jobs:
             --build-number ${GITHUB_RUN_NUMBER} \
             --no-codesign # Primero generamos el build sin firmar para evitar el error de cuentas
 
-      # 4. SUBIR EL RESULTADO
+# 4. SUBIR EL IPA (Ruta corregida para encontrar el archivo)
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ventas-release
-          path: build/ios/ipa/*.ipa
+          # Usamos un patrón más amplio por si Flutter lo guardó en la raíz de build
+          path: |
+            build/ios/ipa/*.ipa
+            build/ios/archive/*.ipa
+            ios/*.ipa
